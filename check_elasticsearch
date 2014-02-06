@@ -207,7 +207,7 @@ class ElasticSearchCheck(NagiosCheck):
                     if 'data' not in attrs or booleanise(attrs['data']):
                         missing_attr = e.args[0]
                         raise Status('warning',
-                                     ("Node '%s' missing location "
+                                     ("WARNING - Node '%s' missing location "
                                       "attribute '%s'" %
                                       (name, missing_attr),))
 
@@ -375,7 +375,7 @@ class ElasticSearchCheck(NagiosCheck):
 
         detail = [] # Collect error messages into this list
 
-        msg = "Monitoring cluster '%s'" % es_health['cluster_name']
+        msg = "Cluster: '%s'. " % es_health['cluster_name']
 
         # Assertion:  Each shard has one primary in STARTED or RELOCATING state.
         downgraded = False
@@ -394,8 +394,7 @@ class ElasticSearchCheck(NagiosCheck):
                                       "shard %d" % (idx_name, shard_no))
 
         if downgraded:
-            msg = ("One or more indexes are missing primary shards.  "
-                   "Use -vv to list them.")
+            msg = ("One or more indexes are missing primary shards. ")
 
         # Assertion:  Each primary has replicas in STARTED state.
         downgraded = False
@@ -423,8 +422,7 @@ class ElasticSearchCheck(NagiosCheck):
                                       "shard %d" % (idx_name, shard_no))
 
         if downgraded:
-            msg = ("One or more indexes are missing replica shards.  "
-                   "Use -vv to list them.")
+            msg = ("One or more indexes are missing replica shards. ")
 
         # Assertion:  You have as many master-eligible nodes in the 
         # cluster as you think you ought to.
@@ -446,7 +444,7 @@ class ElasticSearchCheck(NagiosCheck):
                               (int(opts.master_nodes), n_mnodes))
 
         if downgraded:
-            msg = ("Missing master-eligible nodes")
+            msg = ("Missing master-eligible nodes ")
 
         # Assertion:  Replicas are not stored in the same failure domain 
         # as their primary.
@@ -499,7 +497,7 @@ class ElasticSearchCheck(NagiosCheck):
 
         if downgraded:
             msg = ("One or more index shards are not being replicated "
-                   "across failure domains.  Use -vv to list them.")
+                   "across failure domains. ")
 
         # ES detected a problem that we did not.  This should never 
         # happen.  (If it does, you should work out what happened, then 
@@ -508,12 +506,13 @@ class ElasticSearchCheck(NagiosCheck):
         # output to the operator.
         if their_health < self.health:
             raise Status('critical',
-                         ("Cluster reports degraded health: '%s'" %
+                         ("CRITICAL - Cluster reports degraded health: '%s'" %
                           es_health['status'],),
                          perfdata)
 
+        # TODO test
         raise Status(HEALTH_MAP[self.health],
-                     (msg, None, "%s\n\n%s" % (msg, "\n".join(detail))),
+                     (HEALTH_MAP[self.health].upper() + " - " + msg + "Status: " + es_health['status'].upper() , None, "%s\n\n%s" % (msg, "\n".join(detail))),
                      perfdata)
 
     def downgrade_health(self, new_health):
@@ -545,19 +544,20 @@ def get_json(uri):
     try:
         f = urllib2.urlopen(uri)
     except urllib2.HTTPError, e:
-        raise Status('unknown', ("API failure",
+        raise Status('unknown', ("UNKNOWN - API failure",
                                  None,
                                  "API failure:\n\n%s" % str(e)))
     except urllib2.URLError, e:
         # The server could be down; make this CRITICAL.
-        raise Status('critical', (e.reason,))
+        print e.args
+        raise Status('critical', (e.reason,),)
 
     body = f.read()
 
     try:
         j = json.loads(body)
     except ValueError:
-        raise Status('unknown', ("API returned nonsense",))
+        raise Status('unknown', ("UNKNOWN - API returned nonsense",))
 
     return j
 
